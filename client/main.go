@@ -26,6 +26,7 @@ func main() {
 	var result string
 	var counter int
 
+// for{ select {} }はLabelを使用し無いとfor文を抜けられ無い。
 loop:
 	for {
 		res := sendRequest(url, timeout, counter)
@@ -39,7 +40,7 @@ loop:
 				log.Printf("retry %v times.", counter)
 			} else {
 				log.Println("timeout error")
-				break
+				break loop
 			}
 		}
 	}
@@ -53,20 +54,12 @@ func sendRequest(url string, timeout time.Duration, count int) <-chan string {
 	}
 
 	resChan := make(chan string)
-	timeoutError := make(chan struct{})
-
-	log.Printf("%v: start request", count)
 
 	go func() {
-		log.Print("gorutine request")
-		defer close(resChan)
-
-		log.Print("request prepare")
 		var err error
 		res, err := client.Get(url)
 		if err != nil {
 			log.Printf("%v: HTTP Request Error: %v", count, err)
-			timeoutError <- struct{}{}
 			return
 		}
 		defer res.Body.Close()
@@ -82,13 +75,9 @@ func sendRequest(url string, timeout time.Duration, count int) <-chan string {
 		resChan <- buf.String()
 	}()
 
-	log.Printf("%v: start select", count)
-
 	select {
-	case <-timeoutError:
-		log.Printf("%v: timeout", count)
+	case <-time.After(timeout):
 	}
 
-	log.Printf("%v: send request", count)
 	return resChan
 }
